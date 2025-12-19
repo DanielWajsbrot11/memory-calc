@@ -227,6 +227,25 @@
         <h2>🔧 Advanced Options</h2>
         <div class="input-group">
             <div class="input-field">
+                <label for="redisProvider">Redis Provider</label>
+                <select id="redisProvider">
+                    <option value="35">Google Memorystore (~$35/GB/mo)</option>
+                    <option value="58" selected>AWS ElastiCache (~$58/GB/mo)</option>
+                    <option value="70">Redis Cloud (~$70/GB/mo)</option>
+                    <option value="45">Azure Cache Standard (~$45/GB/mo)</option>
+                    <option value="80">Azure Enterprise (~$80/GB/mo)</option>
+                </select>
+            </div>
+            <div class="input-field">
+                <label for="postgresComputeSize">PostgreSQL Compute Tier</label>
+                <select id="postgresComputeSize">
+                    <option value="50">Light (db.t3.small - $50/mo)</option>
+                    <option value="150" selected>Medium (db.t3.large - $150/mo)</option>
+                    <option value="300">Heavy (db.r5.xlarge - $300/mo)</option>
+                    <option value="600">Enterprise (db.r5.2xlarge - $600/mo)</option>
+                </select>
+            </div>
+            <div class="input-field">
                 <label for="replicationFactor">Replication Factor <span class="label-help">(for HA/DR)</span></label>
                 <select id="replicationFactor">
                     <option value="1">1x (No replication)</option>
@@ -380,13 +399,28 @@
                     <div class="assumption">
                         <strong>📌 Key Assumptions & Pricing:</strong>
                         <ul>
-                            <li><strong>Redis:</strong> $0.08/GB/hour (~$58.40/GB/month) for in-memory storage</li>
-                            <li><strong>PostgreSQL:</strong> $0.10/GB/month for disk storage + separate compute ($50-200/mo)</li>
+                            <li><strong>Redis In-Memory:</strong> $35-80/GB/month depending on provider (Google Memorystore cheapest, Azure Enterprise highest)</li>
+                            <li><strong>PostgreSQL Storage:</strong> $0.115/GB/month for GP3 SSD (AWS RDS pricing)</li>
+                            <li><strong>PostgreSQL Compute:</strong> $50-600/month depending on instance size (separate from storage)</li>
                             <li>Vector embeddings use float32 (4 bytes per dimension)</li>
-                            <li>Text metadata overhead: 30% Redis, 40% PostgreSQL</li>
-                            <li>Vector index overhead varies by type (HNSW typically 2.5x raw vector size)</li>
-                            <li>Compression applied only to text, not vectors</li>
+                            <li>Text metadata overhead: 30% Redis, 40% PostgreSQL (for keys, indexes, relational structure)</li>
+                            <li>Vector index overhead varies by type (HNSW typically 2.5x raw vector size in production)</li>
+                            <li>Compression applied only to text data, not vector embeddings</li>
+                            <li>Replication multiplies storage requirements (2x for primary+replica, 3x for multi-region HA)</li>
                         </ul>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>⚠️ Pricing Disclaimer:</strong>
+                        <p>These estimates use publicly available pricing as of December 2024. Actual costs vary based on:</p>
+                        <ul>
+                            <li>Cloud provider and region (prices can differ by 20-40% between regions)</li>
+                            <li>Commitment discounts (1-3 year reserved instances save 30-60%)</li>
+                            <li>Enterprise agreements and volume discounts</li>
+                            <li>Network egress costs (data transfer out to internet/regions)</li>
+                            <li>Additional features (monitoring, enhanced security, compliance)</li>
+                        </ul>
+                        <p><strong>Always verify with your provider's pricing calculator for exact costs.</strong></p>
                     </div>
                 </div>
             </div>
@@ -445,6 +479,8 @@
             const compressionRatio = parseFloat(document.getElementById('compressionRatio').value);
             const vectorIndexMultiplier = parseFloat(document.getElementById('vectorIndexType').value);
             const includeBackup = document.getElementById('backupStorage').value === 'true';
+            const redisMonthlyRate = parseFloat(document.getElementById('redisProvider').value);
+            const pgComputeMonthlyCost = parseFloat(document.getElementById('postgresComputeSize').value);
 
             // Step 1: Calculate total messages per month
             const activeUsers = totalUsers * activePercent;
@@ -516,17 +552,21 @@ Annual (${retentionMonths} months retention):
   Redis Annual = ${formatBytes(monthlyRedis)} × ${retentionMonths} = ${formatBytes(annualRedis)}
   PostgreSQL Annual = ${formatBytes(monthlyPg)} × ${retentionMonths} = ${formatBytes(annualPg)}`;
 
-            // Step 6: Calculate costs (CORRECTED)
-            const redisGB = annualRedis / (1024**3);
-            const pgGB = annualPg / (1024**3);
+            // Step 6: Calculate costs (CORRECTED with accurate pricing)
+            // Note: annualRedis/annualPg represent TOTAL storage after retention period
+            // For cost calculation, we need AVERAGE monthly storage
+            const monthlyRedisAvg = annualRedis / retentionMonths;
+            const monthlyPgAvg = annualPg / retentionMonths;
+            
+            const redisGB = monthlyRedisAvg / (1024**3);
+            const pgGB = monthlyPgAvg / (1024**3);
 
-            // Redis: $0.08/GB/hour × 730 hours/month = $58.40/GB/month
-            const redisMonthlyRate = 58.40; // $/GB/month
-            const redisAnnualCost = redisGB * redisMonthlyRate;
+            // Redis: Variable per provider ($35-80/GB/month) × 12 months
+            const redisAnnualCost = redisGB * redisMonthlyRate * 12;
 
-            // PostgreSQL: $0.10/GB/month for storage + compute
-            const pgStorageCostAnnual = pgGB * 0.10;
-            const pgComputeCostAnnual = 1200; // ~$100/month for moderate compute
+            // PostgreSQL: $0.115/GB/month for storage + compute
+            const pgStorageCostAnnual = pgGB * 0.115 * 12;
+            const pgComputeCostAnnual = pgComputeMonthlyCost * 12;
             const pgTotalAnnualCost = pgStorageCostAnnual + pgComputeCostAnnual;
 
             const savings = redisAnnualCost - pgTotalAnnualCost;
@@ -534,17 +574,19 @@ Annual (${retentionMonths} months retention):
 
             document.getElementById('step6').textContent = 
 `Redis Stack (in-memory):
-  Storage Size = ${redisGB.toFixed(2)} GB
-  Rate = $${redisMonthlyRate}/GB/month (includes compute)
-  Annual Cost = ${redisGB.toFixed(2)} GB × $${redisMonthlyRate} = ${formatCurrency(redisAnnualCost)}
+  Total Accumulated Storage (${retentionMonths} months) = ${formatBytes(annualRedis)}
+  Average Monthly Storage = ${formatBytes(monthlyRedisAvg)} (${redisGB.toFixed(2)} GB)
+  Rate = $${redisMonthlyRate}/GB/month (selected provider)
+  Annual Cost = ${redisGB.toFixed(2)} GB × $${redisMonthlyRate}/mo × 12 = ${formatCurrency(redisAnnualCost)}
 
 PostgreSQL + pgvector (disk):
-  Storage Size = ${pgGB.toFixed(2)} GB
-  Storage Cost = ${pgGB.toFixed(2)} GB × $0.10/month × 12 = ${formatCurrency(pgStorageCostAnnual)}
-  Compute Cost = $100/month × 12 = ${formatCurrency(pgComputeCostAnnual)}
+  Total Accumulated Storage (${retentionMonths} months) = ${formatBytes(annualPg)}
+  Average Monthly Storage = ${formatBytes(monthlyPgAvg)} (${pgGB.toFixed(2)} GB)
+  Storage Cost = ${pgGB.toFixed(2)} GB × $0.115/month × 12 = ${formatCurrency(pgStorageCostAnnual)}
+  Compute Cost = $${pgComputeMonthlyCost}/month × 12 = ${formatCurrency(pgComputeCostAnnual)}
   Total Annual Cost = ${formatCurrency(pgTotalAnnualCost)}
 
-Savings with PostgreSQL = ${formatCurrency(savings)} (${savingsPercent}% cheaper)`;
+Savings with PostgreSQL = ${formatCurrency(Math.abs(savings))} (${Math.abs(savingsPercent)}% ${savings > 0 ? 'cheaper' : 'more expensive'})`;
 
             // Display results
             document.getElementById('monthlyText').textContent = `Redis: ${formatBytes(textStorageRedis)} | PG: ${formatBytes(textStoragePg)}`;
@@ -560,6 +602,11 @@ Savings with PostgreSQL = ${formatCurrency(savings)} (${savingsPercent}% cheaper
             // Update comparison table
             document.getElementById('redisStorageCost').textContent = formatCurrency(redisAnnualCost) + '/year';
             document.getElementById('pgStorageCost').textContent = formatCurrency(pgStorageCostAnnual) + '/year (storage only)';
+            document.getElementById('pgComputeCost').textContent = formatCurrency(pgComputeCostAnnual) + '/year (compute)';
+            
+            // Add total cost row detail
+            const comparisonNote = ` (Total: ${formatCurrency(pgTotalAnnualCost)}/year)`;
+            document.getElementById('pgStorageCost').textContent += comparisonNote;
 
             // Highlight winner
             const redisBetter = redisAnnualCost < pgTotalAnnualCost;
@@ -579,16 +626,54 @@ Savings with PostgreSQL = ${formatCurrency(savings)} (${savingsPercent}% cheaper
             // Generate recommendations
             let recommendations = '<ul>';
             
+            const redisCheaper = redisAnnualCost < pgTotalAnnualCost;
+            const costDiff = Math.abs(savings);
+            
             if (pgGB > 100) {
-                recommendations += `<li><strong>✅ PostgreSQL Recommended:</strong> Your storage exceeds 100GB (${pgGB.toFixed(1)}GB), making disk-based storage ${formatCurrency(savings)} cheaper annually than in-memory Redis.</li>`;
+                recommendations += `<li><strong>${redisCheaper ? '⚠️' : '✅'} Storage Scale:</strong> Your storage exceeds 100GB (${pgGB.toFixed(1)}GB). `;
+                if (redisCheaper) {
+                    recommendations += `Despite high storage, your chosen Redis provider (${document.getElementById('redisProvider').selectedOptions[0].text}) is still ${formatCurrency(costDiff)} cheaper than PostgreSQL with ${document.getElementById('postgresComputeSize').selectedOptions[0].text} compute.`;
+                } else {
+                    recommendations += `PostgreSQL is ${formatCurrency(costDiff)} cheaper annually than in-memory Redis for this scale.`;
+                }
+                recommendations += '</li>';
             } else if (pgGB < 20) {
-                recommendations += `<li><strong>✅ Redis Stack Viable:</strong> With only ${pgGB.toFixed(1)}GB of storage, Redis's performance benefits may justify the ${formatCurrency(Math.abs(savings))} premium if query speed is critical.</li>`;
+                recommendations += `<li><strong>✅ Modest Storage:</strong> With only ${pgGB.toFixed(1)}GB of storage, `;
+                if (redisCheaper) {
+                    recommendations += `Redis is ${formatCurrency(costDiff)} cheaper and offers superior performance. Good fit for your use case.`;
+                } else {
+                    recommendations += `PostgreSQL is still ${formatCurrency(costDiff)} cheaper. Redis's performance benefits may justify the premium if sub-millisecond response times are critical.`;
+                }
+                recommendations += '</li>';
             } else {
-                recommendations += `<li><strong>⚖️ Either Option Works:</strong> At ${pgGB.toFixed(1)}GB, choose based on: Redis for speed (${formatCurrency(redisAnnualCost)}/year) or PostgreSQL for cost (${formatCurrency(pgTotalAnnualCost)}/year).</li>`;
+                recommendations += `<li><strong>⚖️ Medium Storage (${pgGB.toFixed(1)}GB):</strong> `;
+                if (costDiff < 1000) {
+                    recommendations += `Costs are nearly identical (difference: ${formatCurrency(costDiff)}). Choose based on: Redis for speed, PostgreSQL for operational simplicity.`;
+                } else {
+                    recommendations += `${redisCheaper ? 'Redis' : 'PostgreSQL'} is ${formatCurrency(costDiff)} cheaper (${Math.abs(savingsPercent)}%). `;
+                    recommendations += redisCheaper ? 'Redis wins on both cost and performance here.' : 'PostgreSQL offers significant cost savings.';
+                }
+                recommendations += '</li>';
             }
 
             if (totalUsers >= 500) {
                 recommendations += '<li><strong>🏢 Multi-tenancy:</strong> With 500+ users, PostgreSQL\'s native relational structure (user_id foreign keys, row-level security) is cleaner than Redis key prefixing patterns.</li>';
+            }
+
+            // Provider-specific recommendations
+            const selectedProvider = document.getElementById('redisProvider').selectedOptions[0].text;
+            if (redisMonthlyRate <= 40) {
+                recommendations += `<li><strong>💰 Provider Choice:</strong> You selected ${selectedProvider}, one of the more cost-effective Redis options. If performance meets your needs, this is a smart choice.</li>`;
+            } else if (redisMonthlyRate >= 70) {
+                recommendations += `<li><strong>💸 Premium Provider:</strong> ${selectedProvider} is at the higher end of Redis pricing. Consider Google Memorystore (~$35/GB/mo) or AWS ElastiCache (~$58/GB/mo) if cost is a concern.</li>`;
+            }
+
+            // Compute tier recommendations
+            const pgComputeTier = document.getElementById('postgresComputeSize').selectedOptions[0].text;
+            if (totalMessages > 100000 && pgComputeMonthlyCost < 200) {
+                recommendations += `<li><strong>⚡ Compute Sizing:</strong> With ${totalMessages.toFixed(0)} messages/month, you may need more than ${pgComputeTier}. Consider upgrading to Heavy or Enterprise tier for production loads.</li>`;
+            } else if (totalMessages < 30000 && pgComputeMonthlyCost > 200) {
+                recommendations += `<li><strong>💡 Over-provisioned:</strong> With only ${totalMessages.toFixed(0)} messages/month, ${pgComputeTier} may be more than you need. Consider downgrading to save costs.</li>`;
             }
 
             if (retentionMonths > 6) {
@@ -610,6 +695,8 @@ Savings with PostgreSQL = ${formatCurrency(savings)} (${savingsPercent}% cheaper
             recommendations += '<li><strong>📊 Monitoring:</strong> Track actual query patterns. If 90% of queries hit last 7 days of data, aggressive tiering can dramatically reduce costs.</li>';
             
             recommendations += '<li><strong>🔄 Migration Path:</strong> Start with PostgreSQL for cost efficiency. If query performance becomes an issue, add Redis as a read-through cache (hybrid approach) rather than full migration.</li>';
+            
+            recommendations += `<li><strong>💎 Commitment Discounts:</strong> Both Redis and PostgreSQL offer 1-3 year reserved instances with 30-60% savings. If you're confident in your usage, this could save you ${formatCurrency((redisAnnualCost + pgTotalAnnualCost) * 0.4)} annually.</li>`;
             
             recommendations += '</ul>';
 
