@@ -9,9 +9,7 @@ A small, lightweight web app for estimating memory usage for small projects, pro
 
 ## Live demo 🔗
 
-You can view a deployed demo here: **[Replace this with your live URL](https://rag-memory-calculator.vercel.app/)**
-
-If you've deployed with Vercel, paste your production URL above (for example, `https://your-project.vercel.app`). I can update this for you if you share the URL or I can add an automated badge once the URL is known.
+You can view a deployed demo here: **[MemCalc](https://rag-memory-calculator.vercel.app/)**
 
 ## What is this used for? 💡
 
@@ -82,5 +80,3 @@ Contributions are welcome! Please open an issue or a pull request with a clear d
 This project is provided under the MIT License. See the `LICENSE` file for details (or add one if needed).
 
 ---
-
-If you want, I can expand the README with examples, screenshots, or a link to a live demo — tell me what you'd like to include! ✨
