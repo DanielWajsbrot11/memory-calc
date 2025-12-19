@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise RAG Storage Calculator (Improved)</title>
+    <title>Enterprise RAG Storage Calculator - Redis Stack vs pgvector</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         body {
@@ -180,12 +180,17 @@
     </style>
 </head>
 <body>
-    <p><strong>NOTE:</strong>This is a WIP and may not be 100% accurate</p>
-    <p><strong>Context:</strong> Accurate storage and cost estimation for Redis Stack vs PostgreSQL + pgvector for conversation memory in enterprise n8n workflows.</p>
     <div class="container">
-        <h1>🚀 Enterprise RAG Storage Calculator (v2.0)</h1>
+        <h1>🚀 Enterprise RAG Storage Calculator (v3.0)</h1>
+        <p><strong>Context:</strong> Compare Redis Stack (with RediSearch vector search) vs PostgreSQL + pgvector for conversation memory in enterprise n8n workflows.</p>
         
         <h2>📊 Input Parameters</h2>
+        
+        <div class="assumption" style="margin-bottom: 20px;">
+            <strong>ℹ️ About Redis Stack:</strong>
+            <p>This calculator uses <strong>Redis Stack</strong> pricing, which includes the RediSearch module for vector similarity search. All providers listed support vector embeddings for RAG applications. Standard Redis (ElastiCache, Memorystore) does NOT support vector search.</p>
+        </div>
+        
         <div class="input-group">
             <div class="input-field">
                 <label for="totalUsers">Total Users</label>
@@ -229,22 +234,22 @@
         <h2>🔧 Advanced Options</h2>
         <div class="input-group">
             <div class="input-field">
-                <label for="redisProvider">Redis Provider</label>
+                <label for="redisProvider">Redis Cloud Tier <span class="label-help">(AWS hosting)</span></label>
                 <select id="redisProvider">
-                    <option value="35">Google Memorystore (~$35/GB/mo)</option>
-                    <option value="58" selected>AWS ElastiCache (~$58/GB/mo)</option>
-                    <option value="70">Redis Cloud (~$70/GB/mo)</option>
-                    <option value="45">Azure Cache Standard (~$45/GB/mo)</option>
-                    <option value="80">Azure Enterprise (~$80/GB/mo)</option>
+                    <option value="5.11">Redis Flex (~$5/GB/mo) - DRAM+SSD</option>
+                    <option value="18.25" selected>Essentials (~$18/GB/mo) - Standard</option>
+                    <option value="31.39">Pro (~$31/GB/mo) - $200/mo minimum</option>
+                    <option value="45">Azure Cache Enterprise (~$45/GB/mo)</option>
+                    <option value="50">Self-hosted Redis Stack (~$50/GB/mo)</option>
                 </select>
             </div>
             <div class="input-field">
                 <label for="postgresComputeSize">PostgreSQL Compute Tier</label>
                 <select id="postgresComputeSize">
-                    <option value="50">Light (db.t3.small - $50/mo)</option>
-                    <option value="150" selected>Medium (db.t3.large - $150/mo)</option>
-                    <option value="300">Heavy (db.r5.xlarge - $300/mo)</option>
-                    <option value="600">Enterprise (db.r5.2xlarge - $600/mo)</option>
+                    <option value="26.28">Light (db.t3.small - $26/mo)</option>
+                    <option value="52.56" selected>Medium (db.t3.medium - $53/mo)</option>
+                    <option value="105.12">Heavy (db.t3.large - $105/mo)</option>
+                    <option value="423.40">Enterprise (db.r5.xlarge - $423/mo)</option>
                 </select>
             </div>
             <div class="input-field">
@@ -366,7 +371,7 @@
                         <thead>
                             <tr>
                                 <th>Feature</th>
-                                <th>Redis Stack</th>
+                                <th>Redis Stack (RediSearch)</th>
                                 <th>PostgreSQL + pgvector</th>
                             </tr>
                         </thead>
@@ -417,11 +422,11 @@
                     <div class="assumption">
                         <strong>📌 Key Assumptions & Pricing:</strong>
                         <ul>
-                            <li><strong>Redis In-Memory:</strong> $35-80/GB/month depending on provider (Google Memorystore cheapest, Azure Enterprise highest)</li>
+                            <li><strong>Redis Cloud (AWS):</strong> $5-31/GB/month based on tier (Flex/Essentials/Pro) - official pricing from Redis Cloud calculator</li>
                             <li><strong>PostgreSQL Storage:</strong> $0.115/GB/month for GP3 SSD (AWS RDS pricing)</li>
-                            <li><strong>PostgreSQL Compute:</strong> $50-600/month depending on instance size (separate from storage)</li>
+                            <li><strong>PostgreSQL Compute:</strong> $26-423/month depending on instance (db.t3.small to db.r5.xlarge) - AWS RDS us-east-1 pricing</li>
                             <li>Vector embeddings use float32 (4 bytes per dimension)</li>
-                            <li>Text metadata overhead: 30% Redis, 40% PostgreSQL (for keys, indexes, relational structure)</li>
+                            <li>Text metadata overhead: 30% Redis Stack, 40% PostgreSQL (for keys, indexes, relational structure)</li>
                             <li>Vector index overhead varies by type (HNSW typically 2.5x raw vector size in production)</li>
                             <li>Compression applied only to text data, not vector embeddings</li>
                             <li>Replication multiplies storage requirements (2x for primary+replica, 3x for multi-region HA)</li>
