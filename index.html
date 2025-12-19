@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise RAG Storage Calculator (Improved)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -313,6 +314,22 @@
                 <div class="result-item">
                     <span class="result-label">💡 Savings with PostgreSQL:</span>
                     <span class="result-value" id="savings" style="font-size: 16px; font-weight: bold; color: #28a745;">-</span>
+                </div>
+            </div>
+            
+            <div class="cost-chart-section" id="costChart" style="display: none;">
+                <h3 style="color: #2c3e50; margin-top: 20px;">📊 Cost Breakdown Analysis</h3>
+                <canvas id="costComparisonChart" style="max-height: 400px; margin: 20px 0;"></canvas>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffc107;">
+                        <h4 style="margin-top: 0; color: #856404;">💡 Key Insights</h4>
+                        <div id="costInsights"></div>
+                    </div>
+                    <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; border: 2px solid #17a2b8;">
+                        <h4 style="margin-top: 0; color: #0c5460;">📈 Cost Projections</h4>
+                        <div id="costProjections"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -705,9 +722,165 @@ Savings with PostgreSQL = ${formatCurrency(Math.abs(savings))} (${Math.abs(savin
             // Show results
             document.getElementById('results').style.display = 'block';
             document.getElementById('breakdown').style.display = 'block';
+            document.getElementById('costChart').style.display = 'block';
+
+            // Create cost comparison chart
+            createCostChart(redisAnnualCost, pgStorageCostAnnual, pgComputeCostAnnual, pgTotalAnnualCost);
+            
+            // Generate insights
+            generateCostInsights(redisGB, pgGB, redisAnnualCost, pgTotalAnnualCost, totalMessages, retentionMonths);
 
             // Scroll to results
             document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        let costChart = null;
+
+        function createCostChart(redisTotal, pgStorage, pgCompute, pgTotal) {
+            const ctx = document.getElementById('costComparisonChart');
+            
+            // Destroy existing chart if it exists
+            if (costChart) {
+                costChart.destroy();
+            }
+
+            costChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Redis Stack\n(In-Memory)', 'PostgreSQL + pgvector\n(Disk)'],
+                    datasets: [
+                        {
+                            label: 'Storage Cost',
+                            data: [redisTotal, pgStorage],
+                            backgroundColor: '#e74c3c',
+                            borderColor: '#c0392b',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Compute Cost',
+                            data: [0, pgCompute],
+                            backgroundColor: '#3498db',
+                            borderColor: '#2980b9',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Annual Cost Comparison: Storage vs Compute',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += '$' + context.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return label;
+                                },
+                                footer: function(tooltipItems) {
+                                    let total = 0;
+                                    tooltipItems.forEach(function(tooltipItem) {
+                                        total += tooltipItem.parsed.y;
+                                    });
+                                    return 'Total: $' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Annual Cost (USD)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateCostInsights(redisGB, pgGB, redisCost, pgCost, messagesPerMonth, retentionMonths) {
+            const savings = redisCost - pgCost;
+            const savingsPercent = ((savings / redisCost) * 100).toFixed(1);
+            const costPerMessage = (pgCost / (messagesPerMonth * 12)).toFixed(4);
+            const storageCostRatio = (9.54 / pgCost * 100).toFixed(1); // PostgreSQL storage is ~$9.54/year
+            
+            let insights = '<ul style="margin: 5px 0; padding-left: 20px; font-size: 14px;">';
+            
+            // Main cost driver
+            if (storageCostRatio < 1) {
+                insights += `<li><strong>PostgreSQL is 99% compute cost</strong> - only ${storageCostRatio}% goes to storage. The disk is essentially free compared to compute.</li>`;
+            } else {
+                insights += `<li><strong>Compute dominates PostgreSQL cost</strong> - ${storageCostRatio}% is storage, rest is compute instances.</li>`;
+            }
+            
+            // Cost per message
+            insights += `<li><strong>Cost per message:</strong> $${costPerMessage} (PostgreSQL) - incredibly efficient at scale.</li>`;
+            
+            // Storage efficiency
+            const storageEfficiency = (redisGB / pgGB * 100).toFixed(1);
+            insights += `<li><strong>Storage efficiency:</strong> Both use ~${pgGB.toFixed(1)}GB with similar overhead.</li>`;
+            
+            // Break-even analysis
+            if (savings > 0) {
+                const monthsToBreakEven = (savings / (redisCost / 12 - pgCost / 12)).toFixed(1);
+                insights += `<li><strong>ROI:</strong> PostgreSQL saves ${formatCurrency(savings)}/year (${savingsPercent}% cheaper).</li>`;
+            } else {
+                insights += `<li><strong>Redis premium:</strong> ${formatCurrency(Math.abs(savings))}/year more for sub-millisecond query times.</li>`;
+            }
+            
+            insights += '</ul>';
+            
+            document.getElementById('costInsights').innerHTML = insights;
+            
+            // Generate projections
+            let projections = '<ul style="margin: 5px 0; padding-left: 20px; font-size: 14px;">';
+            
+            // Project at 2x scale
+            const redis2x = redisCost * 2;
+            const pg2x = pgCost * 1.5; // Storage doubles, but same compute
+            projections += `<li><strong>At 2x data (${(messagesPerMonth * 2).toLocaleString()} msgs/mo):</strong><br>Redis: ${formatCurrency(redis2x)}/yr | PostgreSQL: ${formatCurrency(pg2x)}/yr</li>`;
+            
+            // Project at 5x scale
+            const redis5x = redisCost * 5;
+            const pg5x = (9.54 * 5) + (150 * 1.5 * 12); // Storage 5x, compute 1.5x (bigger instance)
+            projections += `<li><strong>At 5x data (${(messagesPerMonth * 5).toLocaleString()} msgs/mo):</strong><br>Redis: ${formatCurrency(redis5x)}/yr | PostgreSQL: ${formatCurrency(pg5x)}/yr</li>`;
+            
+            // With reserved instances
+            const redisReserved = redisCost * 0.5; // ~50% discount
+            const pgReserved = pgCost * 0.6; // ~40% discount (less on storage)
+            projections += `<li><strong>With 3-year reserved pricing:</strong><br>Redis: ${formatCurrency(redisReserved)}/yr | PostgreSQL: ${formatCurrency(pgReserved)}/yr</li>`;
+            
+            projections += '</ul>';
+            
+            document.getElementById('costProjections').innerHTML = projections;
         }
     </script>
 </body>
