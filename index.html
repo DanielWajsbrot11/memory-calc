@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise RAG Storage Calculator</title>
+    <title>Enterprise RAG Storage Calculator (Improved)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -42,14 +42,21 @@
             font-weight: 600;
             margin-bottom: 5px;
             color: #555;
+            font-size: 14px;
         }
-        input {
+        .label-help {
+            font-size: 12px;
+            color: #888;
+            font-weight: 400;
+            margin-left: 5px;
+        }
+        input, select {
             padding: 8px 12px;
             border: 2px solid #ddd;
             border-radius: 6px;
             font-size: 14px;
         }
-        input:focus {
+        input:focus, select:focus {
             border-color: #3498db;
             outline: none;
         }
@@ -76,6 +83,17 @@
             border-radius: 4px;
             border: 1px solid #ddd;
         }
+        .cost-highlight {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .cost-highlight h3 {
+            margin-top: 0;
+            color: #155724;
+        }
         .breakdown {
             background: #fff;
             border: 1px solid #ddd;
@@ -99,6 +117,14 @@
             padding: 15px;
             margin: 10px 0;
         }
+        .warning {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #721c24;
+        }
         .tech-details {
             font-family: 'Monaco', 'Courier New', monospace;
             background: #f4f4f4;
@@ -106,6 +132,7 @@
             border-radius: 6px;
             font-size: 12px;
             overflow-x: auto;
+            white-space: pre-wrap;
         }
         button {
             background: #3498db;
@@ -116,6 +143,7 @@
             cursor: pointer;
             font-size: 16px;
             margin: 10px 0;
+            width: 100%;
         }
         button:hover {
             background: #2980b9;
@@ -135,14 +163,27 @@
             background: #f8f9fa;
             font-weight: 600;
         }
+        .winner {
+            background: #d4edda;
+            font-weight: 600;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Enterprise RAG Storage Calculator</h1>
-        <p><strong>Context:</strong> Storage estimation for Redis Stack vs PostgreSQL + pgvector for conversation memory in an enterprise n8n workflow with 500+ users.</p>
+        <h1>🚀 Enterprise RAG Storage Calculator (v2.0)</h1>
+        <p><strong>Context:</strong> Accurate storage and cost estimation for Redis Stack vs PostgreSQL + pgvector for conversation memory in enterprise n8n workflows.</p>
         
-        <h2>Input Parameters</h2>
+        <h2>📊 Input Parameters</h2>
         <div class="input-group">
             <div class="input-field">
                 <label for="totalUsers">Total Users</label>
@@ -170,7 +211,12 @@
             </div>
             <div class="input-field">
                 <label for="embeddingDimensions">Embedding Dimensions</label>
-                <input type="number" id="embeddingDimensions" value="1536" min="1">
+                <select id="embeddingDimensions">
+                    <option value="384">384 (small models)</option>
+                    <option value="768">768 (medium models)</option>
+                    <option value="1536" selected>1536 (OpenAI ada-002)</option>
+                    <option value="3072">3072 (OpenAI large)</option>
+                </select>
             </div>
             <div class="input-field">
                 <label for="retentionMonths">Data Retention (months)</label>
@@ -178,10 +224,46 @@
             </div>
         </div>
 
-        <button onclick="calculateStorage()">Calculate Storage Requirements</button>
+        <h2>🔧 Advanced Options</h2>
+        <div class="input-group">
+            <div class="input-field">
+                <label for="replicationFactor">Replication Factor <span class="label-help">(for HA/DR)</span></label>
+                <select id="replicationFactor">
+                    <option value="1">1x (No replication)</option>
+                    <option value="2" selected>2x (Primary + Replica)</option>
+                    <option value="3">3x (High availability)</option>
+                </select>
+            </div>
+            <div class="input-field">
+                <label for="compressionRatio">Compression Ratio <span class="label-help">(for text)</span></label>
+                <select id="compressionRatio">
+                    <option value="1">None (1.0x)</option>
+                    <option value="0.7">Light (0.7x)</option>
+                    <option value="0.5" selected>Medium (0.5x)</option>
+                    <option value="0.3">Heavy (0.3x)</option>
+                </select>
+            </div>
+            <div class="input-field">
+                <label for="vectorIndexType">Vector Index Type</label>
+                <select id="vectorIndexType">
+                    <option value="2.5" selected>HNSW (2.5x overhead)</option>
+                    <option value="1.5">IVFFlat (1.5x overhead)</option>
+                    <option value="3.0">HNSW + Quantization (3.0x)</option>
+                </select>
+            </div>
+            <div class="input-field">
+                <label for="backupStorage">Include Backup Storage?</label>
+                <select id="backupStorage">
+                    <option value="false">No</option>
+                    <option value="true" selected>Yes (1x additional)</option>
+                </select>
+            </div>
+        </div>
+
+        <button onclick="calculateStorage()">🧮 Calculate Storage Requirements</button>
 
         <div id="results" class="results" style="display: none;">
-            <h2>Storage Projections</h2>
+            <h2>💾 Storage Projections</h2>
             <div class="result-item">
                 <span class="result-label">Monthly Text Data:</span>
                 <span class="result-value" id="monthlyText">-</span>
@@ -198,31 +280,50 @@
                 <span class="result-label">Annual Storage (with retention):</span>
                 <span class="result-value" id="annualTotal">-</span>
             </div>
+            
+            <div class="cost-highlight">
+                <h3>💰 Annual Cost Comparison</h3>
+                <div class="result-item">
+                    <span class="result-label">Redis Stack (in-memory):</span>
+                    <span class="result-value" id="redisCostTotal" style="font-size: 16px; font-weight: bold;">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">PostgreSQL + pgvector (disk):</span>
+                    <span class="result-value" id="pgCostTotal" style="font-size: 16px; font-weight: bold;">-</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">💡 Savings with PostgreSQL:</span>
+                    <span class="result-value" id="savings" style="font-size: 16px; font-weight: bold; color: #28a745;">-</span>
+                </div>
+            </div>
         </div>
 
         <div id="breakdown" style="display: none;">
             <div class="breakdown">
-                <h3>Detailed Calculation Breakdown</h3>
+                <h3>📋 Detailed Calculation Breakdown</h3>
                 <div class="breakdown-content">
                     <h4>Step 1: Calculate Total Messages</h4>
                     <div class="tech-details" id="step1">-</div>
 
-                    <h4>Step 2: Calculate Text Storage</h4>
+                    <h4>Step 2: Calculate Text Storage (with compression)</h4>
                     <div class="tech-details" id="step2">-</div>
 
                     <h4>Step 3: Calculate Embedding Chunks</h4>
                     <div class="tech-details" id="step3">-</div>
 
-                    <h4>Step 4: Calculate Vector Storage</h4>
+                    <h4>Step 4: Calculate Vector Storage (with index overhead)</h4>
                     <div class="tech-details" id="step4">-</div>
 
-                    <h4>Step 5: Calculate Total with Overhead</h4>
+                    <h4>Step 5: Calculate Total with Replication & Backup</h4>
                     <div class="tech-details" id="step5">-</div>
+
+                    <h4>Step 6: Calculate Annual Costs</h4>
+                    <div class="tech-details" id="step6">-</div>
                 </div>
             </div>
 
             <div class="breakdown">
-                <h3>Redis Stack vs PostgreSQL + pgvector</h3>
+                <h3>⚖️ Redis Stack vs PostgreSQL + pgvector</h3>
                 <div class="breakdown-content">
                     <table class="comparison-table">
                         <thead>
@@ -244,14 +345,19 @@
                                 <td>HNSW or IVFFlat</td>
                             </tr>
                             <tr>
-                                <td>Cost at Scale</td>
-                                <td id="redisCost">-</td>
-                                <td id="pgCost">-</td>
+                                <td>Storage Cost</td>
+                                <td id="redisStorageCost">-</td>
+                                <td id="pgStorageCost">-</td>
+                            </tr>
+                            <tr>
+                                <td>Compute Cost</td>
+                                <td id="redisComputeCost">Included in storage</td>
+                                <td id="pgComputeCost">~$50-200/month (separate)</td>
                             </tr>
                             <tr>
                                 <td>Query Speed</td>
                                 <td>Very Fast (sub-ms)</td>
-                                <td>Fast (1-10ms)</td>
+                                <td>Fast (1-10ms with proper indexing)</td>
                             </tr>
                             <tr>
                                 <td>User Isolation</td>
@@ -259,30 +365,52 @@
                                 <td>Native relational structure</td>
                             </tr>
                             <tr>
-                                <td>Best For</td>
-                                <td>High-speed retrieval, smaller datasets</td>
-                                <td>Large datasets, complex queries, cost efficiency</td>
+                                <td>Scaling Pattern</td>
+                                <td>Vertical (larger instances)</td>
+                                <td>Horizontal (sharding) + Vertical</td>
+                            </tr>
+                            <tr id="bestForRow">
+                                <td>Recommended For</td>
+                                <td id="redisRecommendation">-</td>
+                                <td id="pgRecommendation">-</td>
                             </tr>
                         </tbody>
                     </table>
 
                     <div class="assumption">
-                        <strong>💡 Key Assumptions:</strong>
+                        <strong>📌 Key Assumptions & Pricing:</strong>
                         <ul>
-                            <li>Each message is chunked if longer than chunk size</li>
+                            <li><strong>Redis:</strong> $0.08/GB/hour (~$58.40/GB/month) for in-memory storage</li>
+                            <li><strong>PostgreSQL:</strong> $0.10/GB/month for disk storage + separate compute ($50-200/mo)</li>
                             <li>Vector embeddings use float32 (4 bytes per dimension)</li>
-                            <li>Metadata overhead: ~20% for Redis, ~30% for PostgreSQL</li>
-                            <li>Redis pricing: ~$0.08/GB/hour in-memory</li>
-                            <li>PostgreSQL pricing: ~$0.10/GB/month disk storage</li>
+                            <li>Text metadata overhead: 30% Redis, 40% PostgreSQL</li>
+                            <li>Vector index overhead varies by type (HNSW typically 2.5x raw vector size)</li>
+                            <li>Compression applied only to text, not vectors</li>
                         </ul>
                     </div>
                 </div>
             </div>
 
             <div class="breakdown">
-                <h3>Recommendations</h3>
+                <h3>💡 Recommendations</h3>
                 <div class="breakdown-content" id="recommendations">
                     <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <div class="breakdown">
+                <h3>⚠️ Important Considerations</h3>
+                <div class="breakdown-content">
+                    <div class="warning">
+                        <strong>Production Gotchas:</strong>
+                        <ul>
+                            <li><strong>Redis Memory Spikes:</strong> HNSW index rebuilds can temporarily require 2x storage</li>
+                            <li><strong>Cold Start:</strong> Redis requires full data load into memory on restart (can take hours for large datasets)</li>
+                            <li><strong>PostgreSQL I/O:</strong> Ensure SSD storage (NVMe preferred) for acceptable query performance</li>
+                            <li><strong>Connection Pooling:</strong> Both require proper connection pooling for 500+ concurrent users</li>
+                            <li><strong>Backup Windows:</strong> Large Redis snapshots can cause latency spikes</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -297,6 +425,10 @@
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
+        function formatCurrency(amount) {
+            return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
         function calculateStorage() {
             // Get inputs
             const totalUsers = parseInt(document.getElementById('totalUsers').value);
@@ -307,98 +439,177 @@
             const chunkSize = parseInt(document.getElementById('chunkSize').value);
             const embeddingDims = parseInt(document.getElementById('embeddingDimensions').value);
             const retentionMonths = parseInt(document.getElementById('retentionMonths').value);
+            
+            // Advanced options
+            const replicationFactor = parseInt(document.getElementById('replicationFactor').value);
+            const compressionRatio = parseFloat(document.getElementById('compressionRatio').value);
+            const vectorIndexMultiplier = parseFloat(document.getElementById('vectorIndexType').value);
+            const includeBackup = document.getElementById('backupStorage').value === 'true';
 
             // Step 1: Calculate total messages per month
             const activeUsers = totalUsers * activePercent;
             const totalConversations = activeUsers * conversationsPerUser;
             const totalMessages = totalConversations * messagesPerConv;
 
-            document.getElementById('step1').textContent = `
-Active Users = ${totalUsers} × ${(activePercent * 100).toFixed(0)}% = ${activeUsers.toFixed(0)}
+            document.getElementById('step1').textContent = 
+`Active Users = ${totalUsers} × ${(activePercent * 100).toFixed(0)}% = ${activeUsers.toFixed(0)}
 Total Conversations/Month = ${activeUsers.toFixed(0)} × ${conversationsPerUser} = ${totalConversations.toFixed(0)}
-Total Messages/Month = ${totalConversations.toFixed(0)} × ${messagesPerConv} = ${totalMessages.toFixed(0)}
-            `;
+Total Messages/Month = ${totalConversations.toFixed(0)} × ${messagesPerConv} = ${totalMessages.toFixed(0)}`;
 
-            // Step 2: Calculate text storage
+            // Step 2: Calculate text storage with compression
             const totalTextChars = totalMessages * avgMessageLength;
             const textStorageBytes = totalTextChars; // 1 byte per char (UTF-8 average)
-            const textStorageWithMetadata = textStorageBytes * 1.2; // 20% overhead for metadata
+            const textCompressed = textStorageBytes * compressionRatio;
+            
+            // Metadata overhead (more realistic)
+            const redisTextOverhead = 1.3; // 30% overhead for Redis hashes/keys
+            const pgTextOverhead = 1.4; // 40% overhead for relational structure
+            
+            const textStorageRedis = textCompressed * redisTextOverhead;
+            const textStoragePg = textCompressed * pgTextOverhead;
 
-            document.getElementById('step2').textContent = `
-Total Characters/Month = ${totalMessages.toFixed(0)} × ${avgMessageLength} = ${totalTextChars.toLocaleString()}
+            document.getElementById('step2').textContent = 
+`Total Characters/Month = ${totalMessages.toFixed(0)} × ${avgMessageLength} = ${totalTextChars.toLocaleString()}
 Text Storage (raw) = ${formatBytes(textStorageBytes)}
-Text Storage (with metadata) = ${formatBytes(textStorageWithMetadata)}
-            `;
+Text Storage (compressed ${compressionRatio}x) = ${formatBytes(textCompressed)}
+Redis Text Storage (with 30% metadata) = ${formatBytes(textStorageRedis)}
+PostgreSQL Text Storage (with 40% metadata) = ${formatBytes(textStoragePg)}`;
 
             // Step 3: Calculate embedding chunks
             const avgChunksPerMessage = Math.ceil(avgMessageLength / chunkSize);
             const totalChunks = totalMessages * avgChunksPerMessage;
 
-            document.getElementById('step3').textContent = `
-Chunks per Message = ceil(${avgMessageLength} / ${chunkSize}) = ${avgChunksPerMessage}
-Total Chunks/Month = ${totalMessages.toFixed(0)} × ${avgChunksPerMessage} = ${totalChunks.toFixed(0)}
-            `;
+            document.getElementById('step3').textContent = 
+`Chunks per Message = ceil(${avgMessageLength} / ${chunkSize}) = ${avgChunksPerMessage}
+Total Chunks/Month = ${totalMessages.toFixed(0)} × ${avgChunksPerMessage} = ${totalChunks.toFixed(0)}`;
 
-            // Step 4: Calculate vector storage
+            // Step 4: Calculate vector storage with realistic index overhead
             const bytesPerVector = embeddingDims * 4; // float32 = 4 bytes
             const vectorStorageBytes = totalChunks * bytesPerVector;
-            const vectorStorageWithIndex = vectorStorageBytes * 1.5; // 50% overhead for HNSW index
+            const vectorStorageWithIndex = vectorStorageBytes * vectorIndexMultiplier;
 
-            document.getElementById('step4').textContent = `
-Bytes per Vector = ${embeddingDims} dimensions × 4 bytes = ${bytesPerVector.toLocaleString()} bytes
+            document.getElementById('step4').textContent = 
+`Bytes per Vector = ${embeddingDims} dimensions × 4 bytes = ${bytesPerVector.toLocaleString()} bytes
 Vector Storage (raw) = ${totalChunks.toFixed(0)} × ${formatBytes(bytesPerVector)} = ${formatBytes(vectorStorageBytes)}
-Vector Storage (with index) = ${formatBytes(vectorStorageWithIndex)}
-            `;
+Vector Storage (with ${vectorIndexMultiplier}x index) = ${formatBytes(vectorStorageWithIndex)}`;
 
-            // Step 5: Calculate total with overhead
-            const redisOverhead = 1.2; // 20% overhead
-            const pgOverhead = 1.3; // 30% overhead for relational structure
+            // Step 5: Calculate total with replication and backup
+            const monthlyRedisBase = textStorageRedis + vectorStorageWithIndex;
+            const monthlyPgBase = textStoragePg + vectorStorageWithIndex;
             
-            const monthlyRedis = (textStorageWithMetadata + vectorStorageWithIndex) * redisOverhead;
-            const monthlyPg = (textStorageWithMetadata + vectorStorageWithIndex) * pgOverhead;
+            const monthlyRedis = monthlyRedisBase * replicationFactor * (includeBackup ? 2 : 1);
+            const monthlyPg = monthlyPgBase * replicationFactor * (includeBackup ? 2 : 1);
 
-            document.getElementById('step5').textContent = `
-Redis Total/Month = (${formatBytes(textStorageWithMetadata)} + ${formatBytes(vectorStorageWithIndex)}) × 1.2 = ${formatBytes(monthlyRedis)}
-PostgreSQL Total/Month = (${formatBytes(textStorageWithMetadata)} + ${formatBytes(vectorStorageWithIndex)}) × 1.3 = ${formatBytes(monthlyPg)}
-            `;
-
-            // Calculate annual with retention
             const annualRedis = monthlyRedis * retentionMonths;
             const annualPg = monthlyPg * retentionMonths;
 
+            document.getElementById('step5').textContent = 
+`Base Monthly Storage:
+  Redis = ${formatBytes(textStorageRedis)} + ${formatBytes(vectorStorageWithIndex)} = ${formatBytes(monthlyRedisBase)}
+  PostgreSQL = ${formatBytes(textStoragePg)} + ${formatBytes(vectorStorageWithIndex)} = ${formatBytes(monthlyPgBase)}
+
+With Replication (${replicationFactor}x) and Backup (${includeBackup ? 'Yes' : 'No'}):
+  Redis Monthly = ${formatBytes(monthlyRedisBase)} × ${replicationFactor} × ${includeBackup ? 2 : 1} = ${formatBytes(monthlyRedis)}
+  PostgreSQL Monthly = ${formatBytes(monthlyPgBase)} × ${replicationFactor} × ${includeBackup ? 2 : 1} = ${formatBytes(monthlyPg)}
+
+Annual (${retentionMonths} months retention):
+  Redis Annual = ${formatBytes(monthlyRedis)} × ${retentionMonths} = ${formatBytes(annualRedis)}
+  PostgreSQL Annual = ${formatBytes(monthlyPg)} × ${retentionMonths} = ${formatBytes(annualPg)}`;
+
+            // Step 6: Calculate costs (CORRECTED)
+            const redisGB = annualRedis / (1024**3);
+            const pgGB = annualPg / (1024**3);
+
+            // Redis: $0.08/GB/hour × 730 hours/month = $58.40/GB/month
+            const redisMonthlyRate = 58.40; // $/GB/month
+            const redisAnnualCost = redisGB * redisMonthlyRate;
+
+            // PostgreSQL: $0.10/GB/month for storage + compute
+            const pgStorageCostAnnual = pgGB * 0.10;
+            const pgComputeCostAnnual = 1200; // ~$100/month for moderate compute
+            const pgTotalAnnualCost = pgStorageCostAnnual + pgComputeCostAnnual;
+
+            const savings = redisAnnualCost - pgTotalAnnualCost;
+            const savingsPercent = ((savings / redisAnnualCost) * 100).toFixed(1);
+
+            document.getElementById('step6').textContent = 
+`Redis Stack (in-memory):
+  Storage Size = ${redisGB.toFixed(2)} GB
+  Rate = $${redisMonthlyRate}/GB/month (includes compute)
+  Annual Cost = ${redisGB.toFixed(2)} GB × $${redisMonthlyRate} = ${formatCurrency(redisAnnualCost)}
+
+PostgreSQL + pgvector (disk):
+  Storage Size = ${pgGB.toFixed(2)} GB
+  Storage Cost = ${pgGB.toFixed(2)} GB × $0.10/month × 12 = ${formatCurrency(pgStorageCostAnnual)}
+  Compute Cost = $100/month × 12 = ${formatCurrency(pgComputeCostAnnual)}
+  Total Annual Cost = ${formatCurrency(pgTotalAnnualCost)}
+
+Savings with PostgreSQL = ${formatCurrency(savings)} (${savingsPercent}% cheaper)`;
+
             // Display results
-            document.getElementById('monthlyText').textContent = formatBytes(textStorageWithMetadata);
+            document.getElementById('monthlyText').textContent = `Redis: ${formatBytes(textStorageRedis)} | PG: ${formatBytes(textStoragePg)}`;
             document.getElementById('monthlyVectors').textContent = formatBytes(vectorStorageWithIndex);
             document.getElementById('monthlyTotal').textContent = `Redis: ${formatBytes(monthlyRedis)} | PG: ${formatBytes(monthlyPg)}`;
             document.getElementById('annualTotal').textContent = `Redis: ${formatBytes(annualRedis)} | PG: ${formatBytes(annualPg)}`;
 
-            // Calculate costs
-            const redisHourlyCost = (annualRedis / (1024**3)) * 0.08; // $0.08/GB/hour
-            const redisMonthlyAnnualCost = redisHourlyCost * 730 * 12; // hours per month × 12
-            
-            const pgMonthlyAnnualCost = (annualPg / (1024**3)) * 0.10 * 12; // $0.10/GB/month × 12
+            // Cost display
+            document.getElementById('redisCostTotal').textContent = formatCurrency(redisAnnualCost) + '/year';
+            document.getElementById('pgCostTotal').textContent = formatCurrency(pgTotalAnnualCost) + '/year';
+            document.getElementById('savings').textContent = formatCurrency(Math.abs(savings)) + ` (${Math.abs(savingsPercent)}% ${savings > 0 ? 'cheaper' : 'more expensive'})`;
 
-            document.getElementById('redisCost').textContent = `~$${redisMonthlyAnnualCost.toFixed(2)}/year`;
-            document.getElementById('pgCost').textContent = `~$${pgMonthlyAnnualCost.toFixed(2)}/year`;
+            // Update comparison table
+            document.getElementById('redisStorageCost').textContent = formatCurrency(redisAnnualCost) + '/year';
+            document.getElementById('pgStorageCost').textContent = formatCurrency(pgStorageCostAnnual) + '/year (storage only)';
+
+            // Highlight winner
+            const redisBetter = redisAnnualCost < pgTotalAnnualCost;
+            const winnerText = redisBetter ? 'Redis Stack' : 'PostgreSQL + pgvector';
+            
+            document.getElementById('redisRecommendation').textContent = redisBetter ? '✅ Best for this use case' : 'High-speed retrieval, smaller datasets';
+            document.getElementById('pgRecommendation').textContent = !redisBetter ? '✅ Best for this use case' : 'Large datasets, cost efficiency';
+            
+            if (redisBetter) {
+                document.getElementById('redisRecommendation').parentElement.classList.add('winner');
+                document.getElementById('pgRecommendation').parentElement.classList.remove('winner');
+            } else {
+                document.getElementById('pgRecommendation').parentElement.classList.add('winner');
+                document.getElementById('redisRecommendation').parentElement.classList.remove('winner');
+            }
 
             // Generate recommendations
             let recommendations = '<ul>';
             
-            if (annualPg > 100 * 1024**3) { // > 100GB
-                recommendations += '<li><strong>Consider PostgreSQL + pgvector:</strong> Your projected storage exceeds 100GB annually, making disk-based storage more cost-effective than in-memory Redis.</li>';
+            if (pgGB > 100) {
+                recommendations += `<li><strong>✅ PostgreSQL Recommended:</strong> Your storage exceeds 100GB (${pgGB.toFixed(1)}GB), making disk-based storage ${formatCurrency(savings)} cheaper annually than in-memory Redis.</li>`;
+            } else if (pgGB < 20) {
+                recommendations += `<li><strong>✅ Redis Stack Viable:</strong> With only ${pgGB.toFixed(1)}GB of storage, Redis's performance benefits may justify the ${formatCurrency(Math.abs(savings))} premium if query speed is critical.</li>`;
             } else {
-                recommendations += '<li><strong>Redis Stack is viable:</strong> Your storage requirements are moderate enough that Redis\'s performance benefits may outweigh cost concerns.</li>';
+                recommendations += `<li><strong>⚖️ Either Option Works:</strong> At ${pgGB.toFixed(1)}GB, choose based on: Redis for speed (${formatCurrency(redisAnnualCost)}/year) or PostgreSQL for cost (${formatCurrency(pgTotalAnnualCost)}/year).</li>`;
             }
 
             if (totalUsers >= 500) {
-                recommendations += '<li><strong>User Isolation:</strong> With 500+ users, PostgreSQL\'s native relational structure will make user/session management cleaner than Redis key prefixing.</li>';
+                recommendations += '<li><strong>🏢 Multi-tenancy:</strong> With 500+ users, PostgreSQL\'s native relational structure (user_id foreign keys, row-level security) is cleaner than Redis key prefixing patterns.</li>';
             }
 
-            recommendations += '<li><strong>Hybrid Approach:</strong> Consider using PostgreSQL for cold storage (conversations older than 30 days) and Redis for hot data (recent conversations) to balance cost and performance.</li>';
+            if (retentionMonths > 6) {
+                recommendations += `<li><strong>🌡️ Hot/Cold Storage:</strong> With ${retentionMonths} months retention, consider tiered storage: Redis for last 30 days (hot), PostgreSQL for older data (cold). Can save 40-60% vs all-Redis.</li>`;
+            }
+
+            if (embeddingDims >= 1536) {
+                recommendations += `<li><strong>🔬 Dimension Reduction:</strong> Your ${embeddingDims}-dim embeddings are large. Consider: (1) Smaller models (768-dim), (2) PCA reduction, or (3) Product quantization to cut vector storage by 50-75%.</li>`;
+            }
+
+            if (compressionRatio < 0.7) {
+                recommendations += '<li><strong>✅ Good Compression:</strong> Your compression ratio is helping reduce text storage significantly. Ensure older messages are compressed more aggressively than recent ones.</li>';
+            }
+
+            if (replicationFactor > 2) {
+                recommendations += '<li><strong>⚠️ High Replication:</strong> 3x replication is expensive. Consider 2x replication + separate backup storage (cheaper) unless you need multi-region active-active.</li>';
+            }
+
+            recommendations += '<li><strong>📊 Monitoring:</strong> Track actual query patterns. If 90% of queries hit last 7 days of data, aggressive tiering can dramatically reduce costs.</li>';
             
-            recommendations += '<li><strong>Compression:</strong> Implement text compression (gzip) to reduce storage by 50-70% for older conversations.</li>';
-            
-            recommendations += '<li><strong>Dimension Reduction:</strong> Consider using smaller embedding models (384 or 768 dimensions) or dimensionality reduction techniques to cut vector storage by 50-75%.</li>';
+            recommendations += '<li><strong>🔄 Migration Path:</strong> Start with PostgreSQL for cost efficiency. If query performance becomes an issue, add Redis as a read-through cache (hybrid approach) rather than full migration.</li>';
             
             recommendations += '</ul>';
 
@@ -407,6 +618,9 @@ PostgreSQL Total/Month = (${formatBytes(textStorageWithMetadata)} + ${formatByte
             // Show results
             document.getElementById('results').style.display = 'block';
             document.getElementById('breakdown').style.display = 'block';
+
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     </script>
 </body>
